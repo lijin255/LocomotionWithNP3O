@@ -1241,7 +1241,7 @@ class LeggedRobot(BaseTask):
             self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         else:
             self.commands[env_ids, 2] = torch_rand_float(self.command_ranges["ang_vel_yaw"][0], self.command_ranges["ang_vel_yaw"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-
+        self.commands[env_ids, 4] = torch_rand_float(self.command_ranges["base_height"][0], self.command_ranges["base_height"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         # set small commands to zero
         self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
     
@@ -1345,7 +1345,9 @@ class LeggedRobot(BaseTask):
     def _reward_base_height_up(self):
         # Penalize base height away from target
         base_height = self._get_base_heights()
-        return torch.square(base_height - self.cfg.rewards.base_height_target)*torch.clamp(-self.projected_gravity[:,2],0,1)
+        height_now = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
+        return torch.square(base_height - height_now)*torch.clamp(-self.projected_gravity[:,2],0,1)
+        # return torch.square(base_height - self.cfg.rewards.base_height_target)*torch.clamp(-self.projected_gravity[:,2],0,1)
     
     def _reward_foot_clearance_up(self):
         cur_footpos_translated = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
@@ -1490,7 +1492,12 @@ class LeggedRobot(BaseTask):
         # Tracking of angular velocity commands (yaw) 
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error/self.cfg.rewards.tracking_sigma)
-
+# ------------------------------height---------------
+    def _reward_tracking_base_height(self):  
+        #TODO
+        height_error =torch.square(self.commands[:, 4] - torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1))
+        return torch.exp(-height_error/self.cfg.rewards.tracking_sigma)
+# ------------------------------height---------------
     def _reward_feet_air_time(self):
         # Reward long steps
         # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes

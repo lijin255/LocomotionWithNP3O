@@ -111,7 +111,7 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0
 
-        num_commands = 4  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        num_commands = 5  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10.  # time before command are changed[s]
         heading_command = True  # if true: compute ang vel command from heading error
         global_reference = False
@@ -121,6 +121,7 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1, 1]  # min max [rad/s]
             heading = [-3.14, 3.14]
+            base_height = [0.2, 0.35]
 
     # class commands( LeggedRobotCfg.control ):
     #     curriculum = False
@@ -171,6 +172,7 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
             has_contact = 0.5
             tracking_lin_vel = 2.0
             tracking_ang_vel = 1.0
+            tracking_base_height = 2.0
             stand_nice = -0.1
             #lin_vel_z_up = -4.0
             lin_vel_z_up = -4.0
