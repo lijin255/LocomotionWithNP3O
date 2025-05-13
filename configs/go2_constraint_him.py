@@ -32,7 +32,7 @@ from configs.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
 class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
     class env(LeggedRobotCfg.env):
-        num_envs = 40
+        num_envs = 4096
 
         n_scan = 187
         n_priv_latent =  4 + 1 + 12 + 12 + 12 + 6 + 1 + 4 + 1 - 3 + 3 - 3 + 4 - 7
