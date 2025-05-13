@@ -1275,6 +1275,7 @@ class LeggedRobot(BaseTask):
         """
         # If the tracking reward is above 80% of the maximum, increase the range of commands
         if torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]:
+            #原始奖励的范围是【0,1】
             # self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.1, -self.cfg.commands.max_curriculum, 0.)
             # self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.1, 0., self.cfg.commands.max_curriculum)
             # self.command_ranges["lin_vel_y"][0] = np.clip(self.command_ranges["lin_vel_y"][0] - 0.1, -self.cfg.commands.max_curriculum, 0.)
@@ -1284,6 +1285,8 @@ class LeggedRobot(BaseTask):
             self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.1, 0., self.cfg.commands.max_forward_curriculum)
             self.command_ranges["lin_vel_y"][0] = np.clip(self.command_ranges["lin_vel_y"][0] - 0.1, -self.cfg.commands.max_lat_curriculum, 0.)
             self.command_ranges["lin_vel_y"][1] = np.clip(self.command_ranges["lin_vel_y"][1] + 0.1, 0., self.cfg.commands.max_lat_curriculum)
+            self.command_ranges["base_height"][0] = np.clip(self.command_ranges["base_height"][0] - 0.25, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
+            self.command_ranges["base_height"][1] = np.clip(self.command_ranges["base_height"][1] + 0.1, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
 
 
     def _get_base_heights(self, env_ids=None):
@@ -1427,7 +1430,7 @@ class LeggedRobot(BaseTask):
     #     base_height = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
     #     return torch.square(base_height - self.cfg.rewards.base_height_target)
 
-    def _reward_base_height(self):
+    def _reward_base_height(self):## TODO
         # Penalize base height away from target
         base_height = self._get_base_heights()
         return torch.square(base_height - self.cfg.rewards.base_height_target)
@@ -1494,9 +1497,10 @@ class LeggedRobot(BaseTask):
         return torch.exp(-ang_vel_error/self.cfg.rewards.tracking_sigma)
 # ------------------------------height---------------
     def _reward_tracking_base_height(self):  
-        #TODO
+        #TODO 直立状态下，高度跟踪奖励
         height_error =torch.square(self.commands[:, 4] - torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1))
-        return torch.exp(-height_error/self.cfg.rewards.tracking_sigma)
+        # height_error =height_error*(1 - torch.clamp(self.projected_gravity[:,2],0,1))
+        return height_error
 # ------------------------------height---------------
     def _reward_feet_air_time(self):
         # Reward long steps

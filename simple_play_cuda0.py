@@ -34,7 +34,7 @@ def play(args):
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False
-    #env_cfg.terrain.mesh_type = 'plane'
+    # env_cfg.terrain.mesh_type = 'plane'
     env_cfg.domain_rand.push_robots = False
     #env_cfg.domain_rand.randomize_friction = False
     env_cfg.domain_rand.randomize_base_com = False
@@ -63,7 +63,12 @@ def play(args):
                                                       **policy_cfg_dict)
     print(policy)
     #model_dict = torch.load(os.path.join(ROOT_DIR, 'model_4000_phase2_hip.pt'))
-    model_dict = torch.load(os.path.join(ROOT_DIR, 'logs/rough_go2_constraint/May12_13-34-44_test_barlowtwins/model_7000.pt'))
+    # ROOT_DIR = "/home/ljy/LocomotionWithNP3O"
+    #  #问题出在第二个参数以斜杠开头，即'/logs/...'。在Python的os.path.join函数中，如果一个参数以绝对路径开头（
+    # 即以斜杠或盘符开头），那么之前的参数会被忽略，只保留该绝对路径。
+    print("获取模型路径为：",os.path.join(ROOT_DIR, 'model_10000_32_sb.pt'))
+    model_dict = torch.load(os.path.join(ROOT_DIR, 'model_10000_32_sb.pt'),
+                            map_location=torch.device('cuda:0'))
     policy.load_state_dict(model_dict['model_state_dict'])
     policy.half()
     policy.eval()
@@ -108,10 +113,24 @@ def play(args):
         z_vel += torch.square(env.base_lin_vel[:, 2])
         xy_vel += torch.sum(torch.square(env.base_ang_vel[:, :2]), dim=1)
 
-        env.commands[:,0] = 1
-        env.commands[:,1] = 0
+        env.commands[:,0] = 0.5
+        env.commands[:,1] = 0.5
         env.commands[:,2] = 0
         env.commands[:,3] = 0
+        env.commands[:,4] = 0.2
+        # ----------------------------------------------------------------------------
+        print("【DEBUG】base_height:", torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)) 
+        height_error = torch.square(env.commands[:, 4] - torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1))
+        lin_vel_error = torch.sum(torch.square(env.commands[:, :2] - env.base_lin_vel[:, :2]), dim=1)
+        print("【DEBUG】command_height:", env.commands[:,4])
+        print("【DEBUG】height_gap_square:", height_error)
+        # print("【DEBUG】lin_vel_gap:", lin_vel_error)
+        print("【DEBUG】height reward ",torch.exp(-height_error/env.cfg.rewards.tracking_sigma))
+        # print("【DEBUG】lin_vel reward:", torch.exp(-lin_vel_error/env.cfg.rewards.tracking_sigma))
+        base_height = env._get_base_heights()
+        height_now = torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)
+        print("【DEBUG】base_height_up:",torch.square(base_height - height_now)*torch.clamp(-env.projected_gravity[:,2],0,1) )
+        # ----------------------------------------------------------------------------
         actions = policy.act_teacher(obs.half())
         # actions = torch.clamp(actions,-1.2,1.2)
 
@@ -136,6 +155,7 @@ def play(args):
          for i in range(1000):
             with torch.no_grad():
               actions = policy.act_teacher(obs.half())
+
     print(prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=10))
 
 if __name__ == '__main__':

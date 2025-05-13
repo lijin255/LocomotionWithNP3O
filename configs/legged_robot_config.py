@@ -85,7 +85,8 @@ class LeggedRobotCfg(BaseConfig):
         max_forward_curriculum = 1.5
         max_backward_curriculum = -1.0
         max_lat_curriculum = 0.5
-        
+        max_height_curriculum = 0.35
+        min_height_curriculum = 0.20
         num_commands = 4  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10.  # time before command are changed[s]
         heading_command = True  # if true: compute ang vel command from heading error

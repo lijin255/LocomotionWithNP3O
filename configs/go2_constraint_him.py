@@ -32,7 +32,7 @@ from configs.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
 class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
     class env(LeggedRobotCfg.env):
-        num_envs = 4096
+        num_envs = 40
 
         n_scan = 187
         n_priv_latent =  4 + 1 + 12 + 12 + 12 + 6 + 1 + 4 + 1 - 3 + 3 - 3 + 4 - 7
@@ -110,6 +110,8 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
         max_forward_curriculum = 1.5
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0
+        max_height_curriculum = 0.35
+        min_height_curriculum = 0.20
 
         num_commands = 5  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10.  # time before command are changed[s]
@@ -121,7 +123,7 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1, 1]  # min max [rad/s]
             heading = [-3.14, 3.14]
-            base_height = [0.2, 0.35]
+            base_height = [0.32, 0.32]
 
     # class commands( LeggedRobotCfg.control ):
     #     curriculum = False
@@ -172,7 +174,7 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
             has_contact = 0.5
             tracking_lin_vel = 2.0
             tracking_ang_vel = 1.0
-            tracking_base_height = 2.0
+            tracking_base_height = -20.0
             stand_nice = -0.1
             #lin_vel_z_up = -4.0
             lin_vel_z_up = -4.0
@@ -317,7 +319,7 @@ class Go2ConstraintHimRoughCfgPPO( LeggedRobotCfgPPO ):
         policy_class_name = 'ActorCriticBarlowTwins'
         runner_class_name = 'OnConstraintPolicyRunner'
         algorithm_class_name = 'NP3O'
-        max_iterations = 10000
+        max_iterations = 20000
         num_steps_per_env = 24
         resume = False
         resume_path = ''
