@@ -74,7 +74,7 @@ class LeggedRobotCfg(BaseConfig):
         num_rows = 10  # number of terrain rows (levels)
         num_cols = 20  # number of terrain cols (types)
         # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete]
-        terrain_proportions = [0.1, 0.1, 0.35, 0.25, 0.2]
+        terrain_proportions = [0.2, 0.2, 0.0, 0.0, 0.6] #和为1
         # terrain_proportions = [0.1, 0.2, 0.30, 0.30, 0.1]
         # trimesh only:
         slope_treshold = 0.75  # slopes above this threshold will be corrected to vertical surfaces
@@ -85,11 +85,12 @@ class LeggedRobotCfg(BaseConfig):
         max_forward_curriculum = 1.5
         max_backward_curriculum = -1.0
         max_lat_curriculum = 0.5
-        max_height_curriculum = 0.35
-        min_height_curriculum = 0.20
+        max_height_curriculum = 0.32
+        min_height_curriculum = 0.32
         num_commands = 4  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
-        resampling_time = 10.  # time before command are changed[s]
+        resampling_time = 5.  # time before command are changed[s]
         heading_command = True  # if true: compute ang vel command from heading error
+        height_command = False
         global_reference = False
 
         class ranges:
@@ -291,7 +292,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         max_iterations = 500 # number of policy updates
 
         # logging
-        save_interval = 100 # check for potential saves every this many iterations
+        save_interval = 2000 # check for potential saves every this many iterations
         experiment_name = 'rough_a1'
         run_name = ''
         # load and resume

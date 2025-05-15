@@ -1241,10 +1241,18 @@ class LeggedRobot(BaseTask):
             self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         else:
             self.commands[env_ids, 2] = torch_rand_float(self.command_ranges["ang_vel_yaw"][0], self.command_ranges["ang_vel_yaw"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        self.commands[env_ids, 4] = torch_rand_float(self.command_ranges["base_height"][0], self.command_ranges["base_height"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        if self.cfg.commands.height_command:
+            self.commands[env_ids, 4] = torch_rand_float(self.command_ranges["base_height"][0], self.command_ranges["base_height"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        #筛选高度小命令
+        if self.cfg.commands.height_command:
+            current_height = self.root_states[env_ids, 2]  # 获取当前基座高度
+            # 当高度差小于2cm时使用当前高度，否则随机生成
+            height_diff = torch.mean(torch.abs(current_height - self.commands[env_ids, 4]))
+            if height_diff < 0.02 : # 阈值设为2厘米
+                self.commands[env_ids, 4] = current_height
         # set small commands to zero
         self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
-    
+        
     def _update_terrain_curriculum(self, env_ids):
         """ Implements the game-inspired curriculum.
 
@@ -1285,8 +1293,7 @@ class LeggedRobot(BaseTask):
             self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.1, 0., self.cfg.commands.max_forward_curriculum)
             self.command_ranges["lin_vel_y"][0] = np.clip(self.command_ranges["lin_vel_y"][0] - 0.1, -self.cfg.commands.max_lat_curriculum, 0.)
             self.command_ranges["lin_vel_y"][1] = np.clip(self.command_ranges["lin_vel_y"][1] + 0.1, 0., self.cfg.commands.max_lat_curriculum)
-            self.command_ranges["base_height"][0] = np.clip(self.command_ranges["base_height"][0] - 0.25, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
-            self.command_ranges["base_height"][1] = np.clip(self.command_ranges["base_height"][1] + 0.1, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
+            self.command_ranges["base_height"][0] = np.clip(self.command_ranges["base_height"][0] - 0.3, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
 
 
     def _get_base_heights(self, env_ids=None):
@@ -1349,8 +1356,8 @@ class LeggedRobot(BaseTask):
         # Penalize base height away from target
         base_height = self._get_base_heights()
         height_now = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
-        return torch.square(base_height - height_now)*torch.clamp(-self.projected_gravity[:,2],0,1)
-        # return torch.square(base_height - self.cfg.rewards.base_height_target)*torch.clamp(-self.projected_gravity[:,2],0,1)
+        # return torch.square(base_height - height_now)*torch.clamp(-self.projected_gravity[:,2],0,1)
+        return torch.square(base_height - self.cfg.rewards.base_height_target)*torch.clamp(-self.projected_gravity[:,2],0,1)
     
     def _reward_foot_clearance_up(self):
         cur_footpos_translated = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)

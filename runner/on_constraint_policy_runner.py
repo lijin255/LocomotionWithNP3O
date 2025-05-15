@@ -29,7 +29,7 @@ class OnConstraintPolicyRunner:
         self.depth_encoder_cfg = train_cfg["depth_encoder"]
         self.device = device
         self.env = env
-
+        self.current_learning_iteration = 0
         # self.phase1_end = self.cfg["phase1_end"] 
  
         actor_critic_class = eval(self.cfg["policy_class_name"])  # ActorCritic
@@ -41,9 +41,10 @@ class OnConstraintPolicyRunner:
                                                       self.env.num_actions,
                                                       **self.policy_cfg)
         if self.cfg['resume']:
+            print('resume training,resume_path:',self.cfg['resume_path'])
+            print('load model from {}'.format(os.path.join(ROOT_DIR, self.cfg['resume_path'])))
             model_dict = torch.load(os.path.join(ROOT_DIR, self.cfg['resume_path']))
             actor_critic.load_state_dict(model_dict['model_state_dict'])
-        
         actor_critic.to(self.device)
         
 
@@ -80,16 +81,19 @@ class OnConstraintPolicyRunner:
             [self.env.cfg.cost.num_costs],
             self.env.cost_d_values_tensor
         )
+        if self.cfg['resume']:
+            self.load(os.path.join(ROOT_DIR, self.cfg['resume_path']), load_optimizer=False)
         # Log
         self.log_dir = log_dir
         self.writer = None
         self.tot_timesteps = 0
         self.tot_time = 0
-        self.current_learning_iteration = 0
+        
 
         self.env.reset()
 
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
+        print(f"[DEBUG]Start learning from iteration: {self.current_learning_iteration}")  # 训练开始前验证
         # initialize writer
         if self.log_dir is not None and self.writer is None:
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
@@ -188,7 +192,15 @@ class OnConstraintPolicyRunner:
         self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
         self.tot_time += locs['collection_time'] + locs['learn_time']
         iteration_time = locs['collection_time'] + locs['learn_time']
-
+        completed_iters = locs['it'] - self.current_learning_iteration + 1  # 当前阶段已完成的迭代次数
+        remaining_iters = locs['tot_iter'] - locs['it']  # 总剩余迭代次数
+    
+    # 避免除以零的情况
+        if completed_iters > 0:
+            time_per_iter = self.tot_time / completed_iters
+            eta = time_per_iter * remaining_iters
+        else:
+            eta = 0
         ep_string = f''
         if locs['ep_infos']:
             for key in locs['ep_infos'][0]:
@@ -260,8 +272,7 @@ class OnConstraintPolicyRunner:
                        f"""{'Total timesteps:':>{pad}} {self.tot_timesteps}\n"""
                        f"""{'Iteration time:':>{pad}} {iteration_time:.2f}s\n"""
                        f"""{'Total time:':>{pad}} {self.tot_time:.2f}s\n"""
-                       f"""{'ETA:':>{pad}} {self.tot_time / (locs['it'] + 1) * (
-                               locs['num_learning_iterations'] - locs['it']):.1f}s\n""")
+                        f"""{'ETA:':>{pad}} {eta:.1f}s\n""")
         print(log_string)
 
     def save(self, path, infos=None):
@@ -281,7 +292,9 @@ class OnConstraintPolicyRunner:
         print("Loading model from {}...".format(path))
         loaded_dict = torch.load(path, map_location=self.device)
         self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
-        self.alg.estimator.load_state_dict(loaded_dict['estimator_state_dict'])
+        if hasattr(self.alg, 'estimator') and 'estimator_state_dict' in loaded_dict:
+            self.alg.estimator.load_state_dict(loaded_dict['estimator_state_dict'])
+        
         if self.if_depth:
             if 'depth_encoder_state_dict' not in loaded_dict:
                 warnings.warn("'depth_encoder_state_dict' key does not exist, not loading depth encoder...")
@@ -296,7 +309,8 @@ class OnConstraintPolicyRunner:
                 self.alg.depth_actor.load_state_dict(self.alg.actor_critic.actor.state_dict())
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
-        # self.current_learning_iteration = loaded_dict['iter']
+        self.current_learning_iteration = loaded_dict['iter']
+        print("current_learning_iteration",self.current_learning_iteration)
         print("*" * 80)
         return loaded_dict['infos']
 

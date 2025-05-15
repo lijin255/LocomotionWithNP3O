@@ -95,8 +95,8 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
-        stiffness = {'joint': 40.}  # [N*m/rad]
-        damping = {'joint': 1.0}     # [N*m*s/rad]
+        stiffness = {'joint': 20.}  # [N*m/rad]
+        damping = {'joint': 0.5}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
@@ -105,13 +105,13 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
 
         use_filter = True
 
-    class commands( LeggedRobotCfg.control ):
+    class commands( LeggedRobotCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 1.5
+        max_forward_curriculum = 1.0
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0
-        max_height_curriculum = 0.35
-        min_height_curriculum = 0.20
+        max_height_curriculum = 0.32
+        min_height_curriculum = 0.32
 
         num_commands = 5  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10.  # time before command are changed[s]
@@ -152,7 +152,6 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
         soft_dof_pos_limit = 0.9 
         # soft_dof_vel_limit = 0.9
         # soft_torque_limit = 0.9
-        # base_height_target = 0.34
         # clearance_height_target = -0.24
 
         base_height_target = 0.32
@@ -174,7 +173,7 @@ class Go2ConstraintHimRoughCfg( LeggedRobotCfg ):
             has_contact = 0.5
             tracking_lin_vel = 2.0
             tracking_ang_vel = 1.0
-            tracking_base_height = -20.0
+            # tracking_base_height = -20.0
             stand_nice = -0.1
             #lin_vel_z_up = -4.0
             lin_vel_z_up = -4.0
@@ -319,7 +318,7 @@ class Go2ConstraintHimRoughCfgPPO( LeggedRobotCfgPPO ):
         policy_class_name = 'ActorCriticBarlowTwins'
         runner_class_name = 'OnConstraintPolicyRunner'
         algorithm_class_name = 'NP3O'
-        max_iterations = 20000
+        max_iterations = 10000
         num_steps_per_env = 24
         resume = False
         resume_path = ''

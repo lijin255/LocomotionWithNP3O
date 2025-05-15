@@ -12,6 +12,7 @@ from utils.task_registry import task_registry
 import numpy as np
 import torch
 from global_config import ROOT_DIR
+from configs.go2_stage2 import Go2stage2RoughCfg
 
 from PIL import Image as im
 
@@ -28,27 +29,28 @@ def delete_files_in_directory(directory_path):
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-    # override some parameters for testing
+    # # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 1)
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
-    env_cfg.noise.add_noise = False
-    # env_cfg.terrain.mesh_type = 'plane'
-    env_cfg.domain_rand.push_robots = False
-    #env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.randomize_base_com = False
-    env_cfg.domain_rand.randomize_base_mass = False
-    env_cfg.domain_rand.randomize_motor = False
-    env_cfg.domain_rand.randomize_lag_timesteps = False
-    env_cfg.noise.add_noise = False
-    env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.randomize_restitution = False
-    env_cfg.control.use_filter = True
-    env_cfg.domain_rand.disturbance = False
-    env_cfg.domain_rand.randomize_kpkd = False
+    # env_cfg.noise.add_noise = False
+    env_cfg.terrain.mesh_type = 'plane'
+    # env_cfg.domain_rand.push_robots = False
+    # #env_cfg.domain_rand.randomize_friction = False
+    # env_cfg.domain_rand.randomize_base_com = False
+    # env_cfg.domain_rand.randomize_base_mass = False
+    # env_cfg.domain_rand.randomize_motor = False
+    # env_cfg.domain_rand.randomize_lag_timesteps = False
+    # env_cfg.noise.add_noise = False
+    # env_cfg.domain_rand.randomize_friction = False
+    # env_cfg.domain_rand.randomize_restitution = False
+    # env_cfg.control.use_filter = True
+    # env_cfg.domain_rand.disturbance = False
+    # env_cfg.domain_rand.randomize_kpkd = False
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
+    env.reset()
     obs = env.get_observations()
     # load policy partial_checkpoint_load
     policy_cfg_dict = class_to_dict(train_cfg.policy)
@@ -66,8 +68,8 @@ def play(args):
     # ROOT_DIR = "/home/ljy/LocomotionWithNP3O"
     #  #问题出在第二个参数以斜杠开头，即'/logs/...'。在Python的os.path.join函数中，如果一个参数以绝对路径开头（
     # 即以斜杠或盘符开头），那么之前的参数会被忽略，只保留该绝对路径。
-    print("获取模型路径为：",os.path.join(ROOT_DIR, 'model_10000_32_sb.pt'))
-    model_dict = torch.load(os.path.join(ROOT_DIR, 'model_10000_32_sb.pt'),
+    print("获取模型路径为：",os.path.join(ROOT_DIR, 'logs/rough_go2_constraint/May14_11-25-11_test_barlowtwins/model_10000.pt'))
+    model_dict = torch.load(os.path.join(ROOT_DIR, 'logs/rough_go2_constraint/May14_11-25-11_test_barlowtwins/model_10000.pt'),
                             map_location=torch.device('cuda:0'))
     policy.load_state_dict(model_dict['model_state_dict'])
     policy.half()
@@ -106,49 +108,42 @@ def play(args):
     z_vel = 0
     xy_vel = 0
     feet_air_time = 0
+    try:
+      while True:
+          if cv2.waitKey(1) == 27:  # 27是ESC键的ASCII码
+              break
+      # for i in range(num_frames):
+          action_rate += torch.sum(torch.abs(env.last_actions - env.actions),dim=1)
+          z_vel += torch.square(env.base_lin_vel[:, 2])
+          xy_vel += torch.sum(torch.square(env.base_ang_vel[:, :2]), dim=1)
 
+          env.commands[:,0] = 0.5
+          env.commands[:,1] = 0
+          env.commands[:,2] = 0
+          env.commands[:,3] = 0
+          env.commands[:,4] = 0.32
+          # ----------------------------------------------------------------------------
+          print("【DEBUG】base_height:", torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)) 
+          height_error = torch.square(env.commands[:, 4] - torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1))
+          lin_vel_error = torch.sum(torch.square(env.commands[:, :2] - env.base_lin_vel[:, :2]), dim=1)
+          print("【DEBUG】command_height:", env.commands[:,4])
+          print("【DEBUG】height_gap_square:", height_error)
+          # print("【DEBUG】lin_vel_gap:", lin_vel_error)
+          print("【DEBUG】height reward ",torch.exp(-height_error/env.cfg.rewards.tracking_sigma))
+          # print("【DEBUG】lin_vel reward:", torch.exp(-lin_vel_error/env.cfg.rewards.tracking_sigma))
+          base_height = env._get_base_heights()
+          height_now = torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)
+          print("【DEBUG】base_height_up:",torch.square(base_height - height_now)*torch.clamp(-env.projected_gravity[:,2],0,1) )
+          # ----------------------------------------------------------------------------
+          actions = policy.act_teacher(obs.half())
+          # actions = torch.clamp(actions,-1.2,1.2)
 
-    for i in range(num_frames):
-        action_rate += torch.sum(torch.abs(env.last_actions - env.actions),dim=1)
-        z_vel += torch.square(env.base_lin_vel[:, 2])
-        xy_vel += torch.sum(torch.square(env.base_ang_vel[:, :2]), dim=1)
+          obs, privileged_obs, rewards,costs,dones, infos = env.step(actions)
+          env.gym.step_graphics(env.sim) # required to render in headless mode
+          env.gym.render_all_camera_sensors(env.sim)
+    except KeyboardInterrupt:
+      print("\n用户中断，正在退出...")
 
-        env.commands[:,0] = 0.5
-        env.commands[:,1] = 0.5
-        env.commands[:,2] = 0
-        env.commands[:,3] = 0
-        env.commands[:,4] = 0.2
-        # ----------------------------------------------------------------------------
-        print("【DEBUG】base_height:", torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)) 
-        height_error = torch.square(env.commands[:, 4] - torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1))
-        lin_vel_error = torch.sum(torch.square(env.commands[:, :2] - env.base_lin_vel[:, :2]), dim=1)
-        print("【DEBUG】command_height:", env.commands[:,4])
-        print("【DEBUG】height_gap_square:", height_error)
-        # print("【DEBUG】lin_vel_gap:", lin_vel_error)
-        print("【DEBUG】height reward ",torch.exp(-height_error/env.cfg.rewards.tracking_sigma))
-        # print("【DEBUG】lin_vel reward:", torch.exp(-lin_vel_error/env.cfg.rewards.tracking_sigma))
-        base_height = env._get_base_heights()
-        height_now = torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)
-        print("【DEBUG】base_height_up:",torch.square(base_height - height_now)*torch.clamp(-env.projected_gravity[:,2],0,1) )
-        # ----------------------------------------------------------------------------
-        actions = policy.act_teacher(obs.half())
-        # actions = torch.clamp(actions,-1.2,1.2)
-
-        obs, privileged_obs, rewards,costs,dones, infos = env.step(actions)
-        env.gym.step_graphics(env.sim) # required to render in headless mode
-        env.gym.render_all_camera_sensors(env.sim)
-        if RECORD_FRAMES:
-            img = env.gym.get_camera_image(env.sim, env.envs[0], cam_handle, gymapi.IMAGE_COLOR).reshape((512,512,4))[:,:,:3]
-            if video is None:
-                video = cv2.VideoWriter('record.mp4', cv2.VideoWriter_fourcc(*'MP4V'), int(1 / env.dt), (img.shape[1],img.shape[0]))
-            video.write(img)
-            img_idx += 1 
-    print("action rate:",action_rate/num_frames)
-    print("z vel:",z_vel/num_frames)
-    print("xy_vel:",xy_vel/num_frames)
-    print("feet air reward",feet_air_time/num_frames)
-
-    video.release()
 
     #test model profile
     with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA]) as prof:
@@ -160,7 +155,8 @@ def play(args):
 
 if __name__ == '__main__':
     task_registry.register("go2N3poHim",LeggedRobot,Go2ConstraintHimRoughCfg(),Go2ConstraintHimRoughCfgPPO())
-  
-    RECORD_FRAMES = True
+    task_registry.register("go2stage2",LeggedRobot,Go2stage2RoughCfg(),Go2ConstraintHimRoughCfgPPO())
+
+    RECORD_FRAMES = False
     args = get_args()
     play(args)
