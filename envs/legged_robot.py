@@ -1293,7 +1293,7 @@ class LeggedRobot(BaseTask):
             self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.1, 0., self.cfg.commands.max_forward_curriculum)
             self.command_ranges["lin_vel_y"][0] = np.clip(self.command_ranges["lin_vel_y"][0] - 0.1, -self.cfg.commands.max_lat_curriculum, 0.)
             self.command_ranges["lin_vel_y"][1] = np.clip(self.command_ranges["lin_vel_y"][1] + 0.1, 0., self.cfg.commands.max_lat_curriculum)
-            self.command_ranges["base_height"][0] = np.clip(self.command_ranges["base_height"][0] - 0.3, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
+            self.command_ranges["base_height"][0] = np.clip(self.command_ranges["base_height"][0] - 0.5, self.cfg.commands.min_height_curriculum, self.cfg.commands.max_height_curriculum)
 
 
     def _get_base_heights(self, env_ids=None):
@@ -1506,8 +1506,21 @@ class LeggedRobot(BaseTask):
     def _reward_tracking_base_height(self):  
         #TODO 直立状态下，高度跟踪奖励
         height_error =torch.square(self.commands[:, 4] - torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1))
-        # height_error =height_error*(1 - torch.clamp(self.projected_gravity[:,2],0,1))
-        return height_error
+        return height_error*torch.clamp(-self.projected_gravity[:,2],0,1)
+    def _reward_height_tracking_dynamic_up(self):
+        """动态高度跟踪奖励项，响应高度误差变化率"""
+        # 获取目标高度和当前高度
+        target_height = self.commands[:, 4]
+        current_height = self._get_base_heights()  
+        
+        # 计算高度误差变化率 (通过基座Z轴速度获取瞬时变化率)
+        height_rate = self.base_lin_vel[:, 2] * self.obs_scales.lin_vel #2
+        
+        # 动态响应奖励项：λ * (htarget - hcurr) * dh/dt
+        dynamic_reward =2 * (target_height - current_height) * height_rate
+        
+        # 添加安全系数防止数值不稳定
+        return torch.clip(dynamic_reward, -1.0, 1.0)*torch.clamp(-self.projected_gravity[:,2],0,1)
 # ------------------------------height---------------
     def _reward_feet_air_time(self):
         # Reward long steps

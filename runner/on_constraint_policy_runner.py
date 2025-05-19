@@ -31,7 +31,10 @@ class OnConstraintPolicyRunner:
         self.env = env
         self.current_learning_iteration = 0
         # self.phase1_end = self.cfg["phase1_end"] 
- 
+        # --------------------------------------------
+
+        # --------------------------------------------
+        print("[DEBUG]Creating runner:",self.cfg["policy_class_name"])
         actor_critic_class = eval(self.cfg["policy_class_name"])  # ActorCritic
         actor_critic: ActorCriticRMA = actor_critic_class(self.env.cfg.env.n_proprio,
                                                       self.env.cfg.env.n_scan,
@@ -40,14 +43,7 @@ class OnConstraintPolicyRunner:
                                                       self.env.cfg.env.history_len,
                                                       self.env.num_actions,
                                                       **self.policy_cfg)
-        if self.cfg['resume']:
-            print('resume training,resume_path:',self.cfg['resume_path'])
-            print('load model from {}'.format(os.path.join(ROOT_DIR, self.cfg['resume_path'])))
-            model_dict = torch.load(os.path.join(ROOT_DIR, self.cfg['resume_path']))
-            actor_critic.load_state_dict(model_dict['model_state_dict'])
-        actor_critic.to(self.device)
         
-
         # Depth encoder
         self.if_depth = self.depth_encoder_cfg["if_depth"]
         if self.if_depth:
@@ -81,8 +77,7 @@ class OnConstraintPolicyRunner:
             [self.env.cfg.cost.num_costs],
             self.env.cost_d_values_tensor
         )
-        if self.cfg['resume']:
-            self.load(os.path.join(ROOT_DIR, self.cfg['resume_path']), load_optimizer=False)
+
         # Log
         self.log_dir = log_dir
         self.writer = None
@@ -100,13 +95,13 @@ class OnConstraintPolicyRunner:
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf,
                                                              high=int(self.env.max_episode_length))
-
         obs = self.env.get_observations()
         privileged_obs = self.env.get_privileged_observations()
         critic_obs = privileged_obs if privileged_obs is not None else obs
         obs, critic_obs = obs.to(self.device), critic_obs.to(self.device)
         infos = {}
         infos["depth"] = self.env.depth_buffer.clone().to(self.device) if self.if_depth else None
+        # self.alg.actor_critic.train() # switch to train mode (for dropout for example)
         self.alg.actor_critic.train() # switch to train mode (for dropout for example)
 
         ep_infos = []

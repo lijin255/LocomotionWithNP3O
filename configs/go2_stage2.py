@@ -175,7 +175,7 @@ class Go2stage2RoughCfg( LeggedRobotCfg ):
             has_contact = 0.5
             tracking_lin_vel = 1.0
             tracking_ang_vel = 1.0
-            tracking_base_height = -30.0
+            tracking_base_height = -20.0
             stand_nice = -0.1
             lin_vel_z_up = -1.0
             #ang_vel_xy_up = -0.05
@@ -183,6 +183,7 @@ class Go2stage2RoughCfg( LeggedRobotCfg ):
             orientation_up=-0.2
             feet_contact_forces = -0.00015
             # feet_contact_forces = -0.0002
+            height_tracking_dynamic_up = 20.0
 
 
     class domain_rand( LeggedRobotCfg.domain_rand):
@@ -320,9 +321,10 @@ class Go2Stage2RoughCfgPPO( LeggedRobotCfgPPO ):
         runner_class_name = 'OnConstraintPolicyRunner'
         algorithm_class_name = 'NP3O'
         max_iterations = 10000
-        num_steps_per_env = 24
+        num_steps_per_env = 50
         resume = True
-        resume_path = 'logs/rough_go2_constraint/May14_11-25-11_test_barlowtwins/model_10000.pt'
+        # resume_path = 'logs/rough_go2_constraint/May14_11-25-11_test_barlowtwins/model_10000.pt'
+        resume_path = 'model_10000.pt'
  
 
   
