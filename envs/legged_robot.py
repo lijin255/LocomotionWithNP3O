@@ -1505,23 +1505,36 @@ class LeggedRobot(BaseTask):
 # ------------------------------height---------------
     def _reward_tracking_base_height(self):  
         #TODO 直立状态下，高度跟踪奖励
-        height_error =torch.square(self.commands[:, 4] - torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1))
-        return height_error*torch.clamp(-self.projected_gravity[:,2],0,1)
+        height_error = torch.square(self.commands[:, 4] - torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1))
+    # 对高度变化率进行惩罚，促进高度稳定
+        height_rate_penalty = 0.1 * torch.square(self.base_lin_vel[:, 2])
+        return (height_error + height_rate_penalty) 
     def _reward_height_tracking_dynamic_up(self):
-        """动态高度跟踪奖励项，响应高度误差变化率"""
+        """动态高度跟踪奖励项，确保只对向目标方向的调整给予正奖励"""
         # 获取目标高度和当前高度
         target_height = self.commands[:, 4]
-        current_height = self._get_base_heights()  
+        current_height = self._get_base_heights()
         
-        # 计算高度误差变化率 (通过基座Z轴速度获取瞬时变化率)
-        height_rate = self.base_lin_vel[:, 2] * self.obs_scales.lin_vel #2
+        # 计算高度误差变化率
+        height_rate = self.base_lin_vel[:, 2] * self.obs_scales.lin_vel
+        # 计算高度误差
+        height_error = target_height - current_height
         
-        # 动态响应奖励项：λ * (htarget - hcurr) * dh/dt
-        dynamic_reward =2 * (target_height - current_height) * height_rate
-        
-        # 添加安全系数防止数值不稳定
-        return torch.clip(dynamic_reward, -1.0, 1.0)*torch.clamp(-self.projected_gravity[:,2],0,1)
-# ------------------------------height---------------
+        # 明确方向奖励：只有当速度方向与减少误差的方向一致时才给予正奖励
+        # 当高度低于目标且正在上升，或者高度高于目标且正在下降时，direction_reward为正
+        direction_correct = (height_error > 0) & (height_rate > 0) | (height_error < 0) & (height_rate < 0)
+        direction_reward = torch.where(direction_correct, 
+                                    torch.ones_like(height_error), 
+                                  -1 * torch.ones_like(height_error))
+        # 根据误差大小调整奖励强度：误差越大，调整的动力越强
+        error_magnitude = torch.clamp(10 * torch.abs(height_error), 0.1, 1)
+        # 结合方向奖励和误差大小
+        dynamic_reward = direction_reward * error_magnitude * torch.abs(height_rate)
+        # 限制奖励范围并应用重力系数
+        # print("【DEBUG】return:",torch.clip(dynamic_reward, -1.0, 1.0) )
+        return torch.clip(dynamic_reward, -1.0, 1.0) 
+
+    # ------------------------------height---------------
     def _reward_feet_air_time(self):
         # Reward long steps
         # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes

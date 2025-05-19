@@ -35,7 +35,7 @@ def play(args):
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False
-    # env_cfg.terrain.mesh_type = 'plane'
+    env_cfg.terrain.mesh_type = 'plane'
     env_cfg.domain_rand.push_robots = False
     #env_cfg.domain_rand.randomize_friction = False
     env_cfg.domain_rand.randomize_base_com = False
@@ -68,7 +68,7 @@ def play(args):
     #  #问题出在第二个参数以斜杠开头，即'/logs/...'。在Python的os.path.join函数中，如果一个参数以绝对路径开头（
     # 即以斜杠或盘符开头），那么之前的参数会被忽略，只保留该绝对路径。
     # print("获取模型路径为：",os.path.join(ROOT_DIR, 'logs/rough_go2_constraint/May15_20-11-19_tracking_height/model_20000.pt'))
-    path = os.path.join(ROOT_DIR, 'logs/rough_go2_constraint/May14_11-25-11_test_barlowtwins/model_10000.pt')
+    path = os.path.join(ROOT_DIR, 'model_4000.pt')
     model_dict = torch.load(path, map_location=torch.device('cuda:0'))
     policy.load_state_dict(model_dict['model_state_dict'])
     policy.half()
@@ -120,19 +120,27 @@ def play(args):
           env.commands[:,1] = 0
           env.commands[:,2] = 0
           env.commands[:,3] = 0
-          env.commands[:,4] = 0.1
+          env.commands[:,4] = 0.2
           # ---------------------------------DUBUG-------------------------------------------
-          print("【DEBUG】base_height:", torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)) 
-          height_error = torch.square(env.commands[:, 4] - torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1))
-          lin_vel_error = torch.sum(torch.square(env.commands[:, :2] - env.base_lin_vel[:, :2]), dim=1)
-          print("【DEBUG】command_height:", env.commands[:,4])
-          print("【DEBUG】height_gap_square:", height_error)
-          # print("【DEBUG】lin_vel_gap:", lin_vel_error)
-          print("【DEBUG】height reward ",torch.exp(-height_error/env.cfg.rewards.tracking_sigma))
-          # print("【DEBUG】lin_vel reward:", torch.exp(-lin_vel_error/env.cfg.rewards.tracking_sigma))
-          base_height = env._get_base_heights()
+          # print("【DEBUG】base_height:", torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)) 
+          # height_error = torch.square(env.commands[:, 4] - torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1))
+          # lin_vel_error = torch.sum(torch.square(env.commands[:, :2] - env.base_lin_vel[:, :2]), dim=1)
+          # print("【DEBUG】command_height:", env.commands[:,4])
+          # print("【DEBUG】height_gap_square:", height_error)
+          # # print("【DEBUG】lin_vel_gap:", lin_vel_error)
+          # print("【DEBUG】height reward ",torch.exp(-height_error/env.cfg.rewards.tracking_sigma))
+          # # print("【DEBUG】lin_vel reward:", torch.exp(-lin_vel_error/env.cfg.rewards.tracking_sigma))
+          # base_height = env._get_base_heights()
           height_now = torch.mean(env.root_states[:, 2].unsqueeze(1) - env.measured_heights, dim=1)
-          print("【DEBUG】base_height_up:",torch.square(base_height - height_now)*torch.clamp(-env.projected_gravity[:,2],0,1) )
+          # print("【DEBUG】base_height_up:",torch.square(base_height - height_now)*torch.clamp(-env.projected_gravity[:,2],0,1) )
+          
+          # target_height = env.commands[:, 4]
+          current_height = env._get_base_heights()
+          print("【DEBUG】get_base_heights:",current_height,"measur:",height_now )  
+          # height_rate = env.base_lin_vel[:, 2] * env.obs_scales.lin_vel #2
+          # dynamic_reward =2 * (target_height - current_height) * height_rate
+          # print("【DEBUG】lin_vel_z:",env.base_lin_vel[:, 2] )
+          # print("【DEBUG】dynamic_reward:",dynamic_reward*torch.clamp(-env.projected_gravity[:,2],0,1))
           # --------------------------------PLOT-----------------------------------------
           update_plot()
           # --------------------------------PLOT-----------------------------------------

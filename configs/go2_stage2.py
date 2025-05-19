@@ -107,11 +107,11 @@ class Go2stage2RoughCfg( LeggedRobotCfg ):
 
     class commands( LeggedRobotCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 1.5
+        max_forward_curriculum = 1.0
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0
         max_height_curriculum = 0.32
-        min_height_curriculum = 0.1
+        min_height_curriculum = 0.15
 
         num_commands = 5  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10.  # time before command are changed[s]
@@ -173,17 +173,17 @@ class Go2stage2RoughCfg( LeggedRobotCfg ):
             stumble_up = -0.05
             upward = 0.5
             has_contact = 0.5
-            tracking_lin_vel = 1.0
+            tracking_lin_vel = 2.0
             tracking_ang_vel = 1.0
             tracking_base_height = -20.0
             stand_nice = -0.1
-            lin_vel_z_up = -1.0
+            lin_vel_z_up = - 0.1
             #ang_vel_xy_up = -0.05
             ang_vel_xy_up = -0.1
             orientation_up=-0.2
             feet_contact_forces = -0.00015
             # feet_contact_forces = -0.0002
-            height_tracking_dynamic_up = 20.0
+            height_tracking_dynamic_up = 3.0
 
 
     class domain_rand( LeggedRobotCfg.domain_rand):
@@ -315,13 +315,13 @@ class Go2Stage2RoughCfgPPO( LeggedRobotCfgPPO ):
         imi_flag = True
       
     class runner( LeggedRobotCfgPPO.runner ):
-        run_name = 'tracking_height'
+        run_name = 'tracking_height_24'
         experiment_name = 'rough_go2_constraint'
         policy_class_name = 'ActorCriticBarlowTwins'
         runner_class_name = 'OnConstraintPolicyRunner'
         algorithm_class_name = 'NP3O'
         max_iterations = 10000
-        num_steps_per_env = 50
+        num_steps_per_env = 24
         resume = True
         # resume_path = 'logs/rough_go2_constraint/May14_11-25-11_test_barlowtwins/model_10000.pt'
         resume_path = 'model_10000.pt'
